@@ -1,6 +1,6 @@
 <div align="center">
 
-![GlobalClimateEDA](https://img.shields.io/badge/GlobalClimateEDA-blue) ![Python](https://img.shields.io/badge/Python-3.11+-green) ![Streamlit](https://img.shields.io/badge/Streamlit-4.8+-red)
+![GlobalClimateEDA](https://img.shields.io/badge/GlobalClimateEDA-blue) ![Python](https://img.shields.io/badge/Python-3.11+-green) ![Streamlit](https://img.shields.io/badge/Streamlit-1.50.0-red)
 </div>
 
 # 🌍 Global Climate Insights Dashboard
