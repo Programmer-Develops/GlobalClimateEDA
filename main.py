@@ -16,8 +16,6 @@ st.write(
     "This dashboard provides an exploratory data analysis of global climate change indicators. "
     "Use the sidebar to select countries to analyze."
 )
-st.info("Note: This dashboard is currently running on a synthetically generated dataset due to a file-access issue. The structure and code are ready for the real dataset.")
-
 
 # --- Data Loading ---
 @st.cache_data
