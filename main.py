@@ -40,7 +40,6 @@ if df is None:
 # --- Sidebar for User Inputs ---
 st.sidebar.header('Dashboard Filters')
 
-# Year Range Slider
 min_year, max_year = int(df['Year'].min()), int(df['Year'].max())
 selected_year_range = st.sidebar.slider(
     'Select Year Range',
@@ -49,7 +48,6 @@ selected_year_range = st.sidebar.slider(
     value=(min_year, max_year)
 )
 
-# Country Multiselect
 all_countries = sorted(df['Country'].unique())
 selected_countries = st.sidebar.multiselect(
     'Select Countries',
@@ -93,6 +91,7 @@ else:
 
     # --- Interactive World Map ---
     st.header("Geographical View of Climate Indicators")
+    st.info(f"Choose an indicator to visualize on the world map.")
     map_indicator = st.selectbox(
         'Select Indicator for Map',
         options=['Avg Temperature (°C)', 'CO2 Emissions (Tons/Capita)', 'Renewable Energy (%)', 'Forest Area (%)']
@@ -119,13 +118,14 @@ else:
 
     with tab1:
         st.subheader("Trends of Climate Indicators Over Time")
+        st.info(f"Choose an indicator to analyze its trend over time.")
         trend_indicator = st.selectbox(
             'Select Indicator to Analyze',
             options=df.columns.drop(['Year', 'Country']),
             key='trend_indicator'
         )
         trend_df = filtered_df.groupby('Year')[trend_indicator].mean().reset_index()
-
+        
         fig_trend = px.line(
             trend_df,
             x='Year',
