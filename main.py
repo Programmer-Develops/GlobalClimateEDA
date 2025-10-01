@@ -160,3 +160,5 @@ else:
     st.header('Filtered Data Explorer')
     st.dataframe(filtered_df)
 
+st.markdown("---")
+st.markdown("Made By Team Tech Square | Data Source: Kaggle | Deployed on Streamlit Cloud")
