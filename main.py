@@ -1,111 +1,162 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Global Climate EDA",
+    page_title="Global Climate Insights Dashboard",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # --- Title and Introduction ---
-st.title('Global Climate EDA: An Interactive Dashboard')
-st.write(
-    "This dashboard provides an exploratory data analysis of global climate change indicators. "
-    "Use the sidebar to select countries to analyze."
-)
+st.title('🌍 Global Climate Insights Dashboard')
+st.markdown("An interactive tool to explore climate change indicators and inform policy decisions.")
 
-# --- Data Loading ---
+# --- Data Loading and Cleaning ---
 @st.cache_data
-def load_data():
+def load_and_clean_data():
+    """
+    Loads the dataset, handles potential errors, and performs basic cleaning.
+    To use your real data, ensure the filename is 'climate_change_dataset.csv'.
+    """
     try:
         df = pd.read_csv('climate_change_dataset.csv')
+        df.dropna(inplace=True)
+        return df
     except FileNotFoundError:
-        st.error("Error: The dataset file was not found. Please make sure the CSV file is in the same folder as this app.")
+        st.error("FATAL: The file 'climate_change_dataset.csv' was not found.")
+        st.info("Please make sure your dataset is in the same folder as the app and is named correctly.")
         return None
-    return df
 
-df = load_data()
+df = load_and_clean_data()
+
+# Stop the app if the data fails to load
+if df is None:
+    st.stop()
 
 # --- Sidebar for User Inputs ---
-st.sidebar.header('Filter Options')
+st.sidebar.header('Dashboard Filters')
 
-if df is not None:
-    all_countries = df['Country'].unique()
-    selected_countries = st.sidebar.multiselect(
-        'Select Countries',
-        options=all_countries,
-        default=list(all_countries[:5])  # Default to the first 5 countries
-    )
+# Year Range Slider
+min_year, max_year = int(df['Year'].min()), int(df['Year'].max())
+selected_year_range = st.sidebar.slider(
+    'Select Year Range',
+    min_value=min_year,
+    max_value=max_year,
+    value=(min_year, max_year)
+)
 
-    if selected_countries:
-        filtered_df = df[df['Country'].isin(selected_countries)]
-    else:
-        filtered_df = df.copy()
+# Country Multiselect
+all_countries = sorted(df['Country'].unique())
+selected_countries = st.sidebar.multiselect(
+    'Select Countries',
+    options=all_countries,
+    default=all_countries[:5] 
+)
 
-    # --- Main Panel for Visualizations ---
+# --- Filtering Logic ---
 
-    st.header('Country-wise Analysis')
+if selected_countries:
+    filtered_df = df[
+        (df['Country'].isin(selected_countries)) &
+        (df['Year'] >= selected_year_range[0]) &
+        (df['Year'] <= selected_year_range[1])
+    ]
+else:
+    filtered_df = df[
+        (df['Year'] >= selected_year_range[0]) &
+        (df['Year'] <= selected_year_range[1])
+    ]
 
-    # --- Bar Chart: Average Temperature by Country ---
-    st.subheader('Average Temperature Comparison')
-    if not filtered_df.empty and selected_countries:
-        avg_temp_by_country = filtered_df.groupby('Country')['Avg Temperature (°C)'].mean().sort_values()
-        fig_bar, ax_bar = plt.subplots(figsize=(10, 6))
-        sns.barplot(x=avg_temp_by_country.values, y=avg_temp_by_country.index, ax=ax_bar, palette="coolwarm")
-        ax_bar.set_xlabel('Average Temperature (°C)')
-        ax_bar.set_ylabel('Country')
-        ax_bar.set_title('Average Temperature for Selected Countries')
-        st.pyplot(fig_bar)
-    else:
-        st.warning("Please select at least one country to see the temperature comparison.")
+# --- Main Panel ---
+
+if filtered_df.empty:
+    st.warning("No data available for the selected filters. Please adjust your selections.")
+else:
+    # --- KPI Metrics Section ---
+    st.header("High-Level KPIs")
+    avg_temp = filtered_df['Avg Temperature (°C)'].mean()
+    avg_co2 = filtered_df['CO2 Emissions (Tons/Capita)'].mean()
+    total_events = filtered_df['Extreme Weather Events'].sum()
+    avg_renewable = filtered_df['Renewable Energy (%)'].mean()
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Avg. Temperature", f"{avg_temp:.2f} °C")
+    col2.metric("Avg. CO2 Emissions", f"{avg_co2:.2f} T/Capita")
+    col3.metric("Total Extreme Events", f"{total_events:,.0f}")
+    col4.metric("Avg. Renewable Energy", f"{avg_renewable:.2f} %")
 
     st.markdown("---")
 
-    # --- Time Series and Relationship Plots ---
-    st.header("Trends and Relationships")
-    col1, col2 = st.columns(2)
+    # --- Interactive World Map ---
+    st.header("Geographical View of Climate Indicators")
+    map_indicator = st.selectbox(
+        'Select Indicator for Map',
+        options=['Avg Temperature (°C)', 'CO2 Emissions (Tons/Capita)', 'Renewable Energy (%)', 'Forest Area (%)']
+    )
 
-    # --- Line Chart: Sea Level Rise Over Time ---
-    with col1:
-        st.subheader('Average Sea Level Rise Over Time')
-        if not filtered_df.empty and selected_countries:
-            avg_slr_by_year = filtered_df.groupby('Year')['Sea Level Rise (mm)'].mean()
-            fig_line, ax_line = plt.subplots(figsize=(10, 6))
-            sns.lineplot(data=avg_slr_by_year, marker='o', ax=ax_line, color='teal')
-            ax_line.set_ylabel('Avg Sea Level Rise (mm)')
-            ax_line.set_xlabel('Year')
-            ax_line.set_title('Average Sea Level Rise (for selected countries)')
-            ax_line.grid(True)
-            st.pyplot(fig_line)
+    map_df = filtered_df.groupby('Country')[map_indicator].mean().reset_index()
 
-    # --- Scatter Plot: CO2 vs. Temperature ---
-    with col2:
-        st.subheader('CO2 Emissions vs. Temperature')
-        if not filtered_df.empty and selected_countries:
-            fig_scatter, ax_scatter = plt.subplots(figsize=(10, 6))
-            sns.scatterplot(
-                data=filtered_df,
+    fig_map = px.choropleth(
+        map_df,
+        locations="Country",
+        locationmode="country names",
+        color=map_indicator,
+        hover_name="Country",
+        color_continuous_scale=px.colors.sequential.Plasma,
+        title=f"{map_indicator} Across Selected Countries"
+    )
+    fig_map.update_layout(margin={"r":0,"t":30,"l":0,"b":0})
+    st.plotly_chart(fig_map, use_container_width=True)
+
+
+    # --- Tabs for Detailed Charts ---
+    st.header("Detailed Analysis")
+    tab1, tab2 = st.tabs(["📈 Trend Analysis", "📊 Relationship Analysis"])
+
+    with tab1:
+        st.subheader("Trends of Climate Indicators Over Time")
+        trend_indicator = st.selectbox(
+            'Select Indicator to Analyze',
+            options=df.columns.drop(['Year', 'Country']),
+            key='trend_indicator'
+        )
+        trend_df = filtered_df.groupby('Year')[trend_indicator].mean().reset_index()
+
+        fig_trend = px.line(
+            trend_df,
+            x='Year',
+            y=trend_indicator,
+            title=f'Average {trend_indicator} Over Time',
+            markers=True
+        )
+        fig_trend.update_layout(xaxis_title='Year', yaxis_title=trend_indicator)
+        st.plotly_chart(fig_trend, use_container_width=True)
+
+    with tab2:
+        col_rel_1, col_rel_2 = st.columns(2)
+        with col_rel_1:
+            st.subheader("Correlation Heatmap")
+            corr = filtered_df.drop('Year', axis=1).corr(numeric_only=True)
+            fig_heatmap, ax = plt.subplots(figsize=(8, 6))
+            sns.heatmap(corr, annot=True, cmap='viridis', fmt=".2f", ax=ax, annot_kws={"size": 8})
+            st.pyplot(fig_heatmap)
+
+        with col_rel_2:
+            st.subheader("CO2 Emissions vs. Temperature")
+            fig_scatter = px.scatter(
+                filtered_df,
                 x='CO2 Emissions (Tons/Capita)',
                 y='Avg Temperature (°C)',
-                hue='Country',
-                alpha=0.8,
-                s=100,  # marker size
-                ax=ax_scatter
+                color='Country',
+                hover_name='Country',
+                title='CO2 Emissions vs. Average Temperature'
             )
-            ax_scatter.set_title('CO2 Emissions vs. Temperature')
-            ax_scatter.legend(title='Country', bbox_to_anchor=(1.05, 1), loc='upper left')
-            plt.tight_layout()
-            st.pyplot(fig_scatter)
+            st.plotly_chart(fig_scatter, use_container_width=True)
 
-    # --- Displaying the Filtered Data ---
     st.header('Filtered Data Explorer')
-    if selected_countries:
-        st.dataframe(filtered_df)
-    else:
-        st.write("Select countries from the sidebar to view data.")
+    st.dataframe(filtered_df)
 
-else:
-    st.warning("Could not load data to run the dashboard.")
